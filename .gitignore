@@ -9,6 +9,7 @@ __pycache__/
 data/indexes/
 data/logs/
 data/sessions/
+data/pdfs/*.pdf
 
 # OS files
 .DS_Store
