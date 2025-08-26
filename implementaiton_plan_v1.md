@@ -38,6 +38,11 @@
   - *Deps:* V1-010
   - *DoD:* Equations appear as `$$ ... $$` or similar placeholders in extracted text.
 
+- **V1-012a: Text Cleaning & Noise Removal**
+  - *Desc:* Produce cleaned text for indexing/LLM while preserving raw anchors for citations. Remove headers, footers, page numbers, hyphenation, and boilerplate; mark footnotes for optional exclusion.
+  - *Deps:* V1-010
+  - *DoD:* Cleaned text improves retrieval quality; raw citations remain accurate; configurable thresholds for removal.
+
 - **V1-013: Layout-aware chunking**
   - *Desc:* Implement `ingestion/chunking.py` (900–1200 tokens, 150–200 overlap) with section/page anchors.
   - *Deps:* V1-010, V1-011
