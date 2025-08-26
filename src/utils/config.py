@@ -28,3 +28,6 @@ def get_settings():
         "top_k_dense": cfg.get("top_k_dense", 50),
         "top_k_bm25": cfg.get("top_k_bm25", 50),
     }
+
+if __name__ == "__main__":
+    print(get_settings())
