@@ -23,15 +23,21 @@
 ## EPIC 1 — Ingestion Pipeline
 **Goal:** Parse PDFs, reconstruct formulas (best-effort), chunk with layout, enrich metadata, and prepare for indexing.
 
-- **V1-010: PDF text extraction**
+- **V1-010: PDF text extraction**  - **(DONE - ✅)**
   - *Desc:* Implement `pymupdf` extraction in `ingestion/pdf_parser.py`; capture page text + bbox spans.
   - *Deps:* 0
   - *DoD:* Unit test parses sample PDFs; corrupt files are detected.
 
-- **V1-011: Metadata extraction**
-  - *Desc:* In `ingestion/metadata.py`, extract title/author/year (when available), section/heading hints.
+- **V1-011: Metadata extraction (manual entry)**
+  - *Desc:* On ingestion, prompt the user to enter minimal metadata per-document (by md5). Required: {title, authors, year, doi, doc_type, language}. Optional: {publisher, isbn/issn, url, short_title, edition, volume, issue, pages_total, tags, summary, institution, license, notes}. Auto-fill: {doc_id(md5), file_name, file_path, ingested_at, embeddings_model/version, corpus_hash}.
   - *Deps:* V1-010
-  - *DoD:* Metadata attached to doc object; defaults when fields missing.
+  - *DoD:* Streamlit form appears after file parsing; metadata saved under `data/indexes/metadata/{md5}.json`; values reloaded on reindex (no re-prompt unless user chooses “Edit”).
+
+
+- **V1-011b: LLM-assisted metadata (local)**
+  - *Desc:* Use a local quantized instruction model (Phi-3 Mini / Qwen2-7B / Llama-3 8B via Ollama) to extract `{title, authors, year, doi}` from the first 8–10 pages. Keep plain-text regex for DOI/year as pre/post validation. Cache by md5.
+  - *Deps:* V1-010 (PDF text), V1-011 (simple metadata), V1-012a (optional cleaning for the skim)
+  - *DoD:* On a representative sample, LLM outputs valid JSON ≥95% of the time; DOI/year pass regex checks; cached to skip re-runs; falls back gracefully when unsure.
 
 - **V1-012: Formula reconstruction (best-effort)**
   - *Desc:* Normalize Unicode math; wrap detected equations as LaTeX-like tokens for indexing.
