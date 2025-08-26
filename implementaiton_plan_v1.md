@@ -28,26 +28,36 @@
   - *Deps:* 0
   - *DoD:* Unit test parses sample PDFs; corrupt files are detected.
 
-- **V1-011: Metadata extraction (manual entry)**
+- **V1-011: Metadata extraction (manual entry)** - **(DONE - ✅)**
   - *Desc:* On ingestion, prompt the user to enter minimal metadata per-document (by md5). Required: {title, authors, year, doi, doc_type, language}. Optional: {publisher, isbn/issn, url, short_title, edition, volume, issue, pages_total, tags, summary, institution, license, notes}. Auto-fill: {doc_id(md5), file_name, file_path, ingested_at, embeddings_model/version, corpus_hash}.
   - *Deps:* V1-010
   - *DoD:* Streamlit form appears after file parsing; metadata saved under `data/indexes/metadata/{md5}.json`; values reloaded on reindex (no re-prompt unless user chooses “Edit”).
 
 
-- **V1-011b: LLM-assisted metadata (local)**
+- **V1-011b: LLM-assisted metadata (local)** - POSTPONED 🚩
   - *Desc:* Use a local quantized instruction model (Phi-3 Mini / Qwen2-7B / Llama-3 8B via Ollama) to extract `{title, authors, year, doi}` from the first 8–10 pages. Keep plain-text regex for DOI/year as pre/post validation. Cache by md5.
   - *Deps:* V1-010 (PDF text), V1-011 (simple metadata), V1-012a (optional cleaning for the skim)
   - *DoD:* On a representative sample, LLM outputs valid JSON ≥95% of the time; DOI/year pass regex checks; cached to skip re-runs; falls back gracefully when unsure.
 
-- **V1-012: Formula reconstruction (best-effort)**
+- **V1-012: Formula reconstruction (best-effort)** - POSTPONED 🚩
   - *Desc:* Normalize Unicode math; wrap detected equations as LaTeX-like tokens for indexing.
   - *Deps:* V1-010
   - *DoD:* Equations appear as `$$ ... $$` or similar placeholders in extracted text.
 
-- **V1-012a: Text Cleaning & Noise Removal**
+- **V1-012a: Text Cleaning & Noise Removal** - **(DONE - ✅)**
   - *Desc:* Produce cleaned text for indexing/LLM while preserving raw anchors for citations. Remove headers, footers, page numbers, hyphenation, and boilerplate; mark footnotes for optional exclusion.
   - *Deps:* V1-010
   - *DoD:* Cleaned text improves retrieval quality; raw citations remain accurate; configurable thresholds for removal.
+
+- **V2-021: Header/Footer Cleanup** - POSTPONED 🚩
+  - *Desc:* Reintroduce robust header/footer detection using layout-based heuristics (frequency across pages, top/bottom position, text normalization) to automatically remove running headers, footers, bylines, and page numbers from page text before chunking/embedding. Must be configurable and language-agnostic.  
+  - *Deps:* V1-012a (basic text cleaning)  
+  - *DoD:*  
+    - Headers/footers repeating on ≥ N pages are removed before paragraph reflow.  
+    - Page numbers and common boilerplate lines filtered out.  
+    - Configurable min-page frequency, top/bottom margins, and gap thresholds.  
+    - Unit tests with synthetic multi-page PDFs to ensure no loss of paragraph content.  
+
 
 - **V1-013: Layout-aware chunking**
   - *Desc:* Implement `ingestion/chunking.py` (900–1200 tokens, 150–200 overlap) with section/page anchors.
