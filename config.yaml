@@ -1,0 +1,6 @@
+embedding_model: "BAAI/bge-large-en-v1.5"
+reranker_model: "BAAI/bge-reranker-large"
+chunk_size: 1000
+chunk_overlap: 150
+top_k_dense: 50
+top_k_bm25: 50

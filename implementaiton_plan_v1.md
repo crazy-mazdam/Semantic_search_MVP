@@ -3,17 +3,17 @@
 ## EPIC 0 — Project Bootstrap & Foundations
 **Goal:** Create a clean, configurable skeleton with logging and paths.
 
-- **V1-001: Repo scaffold & paths**
+- **V1-001: Repo scaffold & paths** - **(DONE - ✅)**
   - *Desc:* Create `rag_project/` structure; add `data/{pdfs,indexes,logs,sessions}`, `src/` subpackages, `tests/`, `config.yaml`, `.env.example`.
   - *Deps:* —
   - *DoD:* Tree matches spec; `README.md` minimal; `.gitignore` excludes `.env`, `data/indexes`, logs.
 
-- **V1-002: Config loader**
+- **V1-002: Config loader** - **(DONE - ✅)**
   - *Desc:* Centralize settings (paths, chunk sizes, K values, thresholds, model names) in `utils/config.py` reading `config.yaml` + env overrides.
   - *Deps:* V1-001
   - *DoD:* Single import provides typed config across modules.
 
-- **V1-003: Logging & rotation**
+- **V1-003: Logging & rotation** - **(DONE - ✅)**
   - *Desc:* JSON logger in `utils/logging_utils.py` with daily rotation (14-day retention) to `data/logs/`.
   - *Deps:* V1-001
   - *DoD:* Logs include correlation IDs, timings; verified file rotation.
