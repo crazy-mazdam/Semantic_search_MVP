@@ -59,12 +59,12 @@
     - Unit tests with synthetic multi-page PDFs to ensure no loss of paragraph content.  
 
 
-- **V1-013: Layout-aware chunking**
+- **V1-013: Layout-aware chunking** - **(DONE - ✅)**
   - *Desc:* Implement `ingestion/chunking.py` (900–1200 tokens, 150–200 overlap) with section/page anchors.
   - *Deps:* V1-010, V1-011
   - *DoD:* Chunks carry `{doc_id, section, page_start/end, char_start/end, chunk_idx}`.
 
-- **V1-014: Duplicate detection**
+- **V1-014: Duplicate detection**  - POSTPONED 🚩
   - *Desc:* Compute md5; skip identical PDFs (even if renamed).
   - *Deps:* V1-010
   - *DoD:* Re-ingestion of duplicates results in no new chunks.
@@ -79,12 +79,12 @@
 ## EPIC 2 — Indexing Backends (Chroma + BM25)
 **Goal:** Persist search indexes locally; GPU embeddings; simple BM25.
 
-- **V1-020: Chroma initialization**
+- **V1-020: Chroma initialization** - **(DONE - ✅)**
   - *Desc:* Create/attach persistent Chroma DB in `data/indexes/`; collection schema for chunks + metadata.
   - *Deps:* 1
   - *DoD:* Chroma can upsert/search; vectors persist across runs.
 
-- **V1-021: Embeddings pipeline (GPU)**
+- **V1-021: Embeddings pipeline (GPU)** - **(DONE - ✅)**
   - *Desc:* `BGE-Large-EN v1.5` embeddings with batch auto-tune for 8GB VRAM.
   - *Deps:* V1-020
   - *DoD:* Throughput validated; OOM handled with smaller batches.
