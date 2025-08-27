@@ -8,29 +8,38 @@ from chromadb.config import Settings
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 from dotenv import load_dotenv   # <-- add this
 
-CHROMA_DIR = Path("data/indexes/chroma")
-COLLECTION_NAME = "documents"
 
 # Load .env so OPENAI_API_KEY becomes visible to os.getenv
 load_dotenv()
 
-def init_chroma(persist_dir: str | Path = CHROMA_DIR,
-                collection_name: str = COLLECTION_NAME):
-    """Initialize a local, persistent Chroma client + collection."""
-    persist_dir = Path(persist_dir)
-    persist_dir.mkdir(parents=True, exist_ok=True)
+# NEW: use project-rooted path
+from utils.paths import indexes_dir
 
-    client = chromadb.Client(Settings(
-        persist_directory=str(persist_dir),
-        anonymized_telemetry=False
-    ))
+COLLECTION_NAME = "documents"
 
+def _persist_dir() -> Path:
+    # always the same path regardless of CWD
+    d = indexes_dir() / "chroma"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
 
+def init_chroma(collection_name: str = COLLECTION_NAME):
+    load_dotenv()
+    persist_dir = _persist_dir()
 
-    # Read key from env (.env is already loaded by your config loader)
+    # Prefer PersistentClient to avoid surprises
+    try:
+        client = chromadb.PersistentClient(path=str(persist_dir))
+    except AttributeError:
+        # fallback for older chromadb
+        client = chromadb.Client(Settings(
+            persist_directory=str(persist_dir),
+            anonymized_telemetry=False,
+        ))
+
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
-        raise RuntimeError("OPENAI_API_KEY not found in environment")
+        raise RuntimeError("OPENAI_API_KEY not found in environment or .env")
 
     embed_fn = OpenAIEmbeddingFunction(
         api_key=api_key,
