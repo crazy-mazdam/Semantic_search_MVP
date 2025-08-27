@@ -6,7 +6,7 @@ sys.path.append('F:\Semantic_search_MVP\src')
 from retrieval.dense import retrieve
 
 def main():
-    q = "How does population aging affect savings and current accounts?"
+    q = "How population structures are shifting over time?"
     if len(sys.argv) > 1:
         q = " ".join(sys.argv[1:])
     print("Query:", q, flush=True)
