@@ -204,7 +204,7 @@ def _tab_ask():
             top_k = st.session_state[SS["settings"]]["top_k"]
             # Retrieve for debug view and to keep consistent with answer context
             hits = retrieve(question, top_k=top_k)
-            ans = answer_with_citations(question, top_k=top_k, model=st.session_state[SS]["settings"]["model"])
+            ans = answer_with_citations(question, top_k=top_k, model=st.session_state[SS["settings"]]["model"])
         # persist results so future reruns (e.g., toggling UI) don’t lose them
         st.session_state["ask_last_hits"] = hits
         st.session_state["ask_last_ans"] = ans
