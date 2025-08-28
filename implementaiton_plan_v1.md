@@ -194,7 +194,7 @@
   - *Deps:* 3
   - *DoD:* Sorted tables render; expandable chunk previews.
 
-- **V1-053: Ask/Answer view**
+- **V1-053: Ask/Answer view**  - **(DONE - ✅)**
   - *Desc:* Input box; display grounded answer; list citations with file link + quoted text (no deep page links).
   - *Deps:* 4
   - *DoD:* Usable end-to-end Q→A with citations.
