@@ -119,3 +119,12 @@ def add_chunks_batched(
             i += 1
 
         collection.add(ids=batch_ids, documents=batch_docs, metadatas=batch_metas)
+
+def collection_count(collection=None) -> int:
+    """Return number of records (chunks) in the default collection."""
+    if collection is None:
+        _, collection = init_chroma()
+    try:
+        return collection.count()
+    except Exception:
+        return 0

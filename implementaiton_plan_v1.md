@@ -179,12 +179,12 @@
 ## EPIC 5 — Streamlit UI
 **Goal:** Minimal, focused UI per requirements.
 
-- **V1-050: App skeleton & state** **(DONE - ✅)**
+- **V1-050: App skeleton & state** - **(DONE - ✅)**
   - *Desc:* `ui/app.py` with sidebar nav; `ui/state.py` for session objects & token budget setting (config-only).
   - *Deps:* 0
   - *DoD:* App runs; placeholder panels visible.
 
-- **V1-051: File uploader & ingestion status**
+- **V1-051: File uploader & ingestion status** - **(DONE - ✅)**
   - *Desc:* Upload to `data/pdfs/`; show parse/chunk/index counts; errors surfaced from logs.
   - *Deps:* 1, 2
   - *DoD:* User can upload and trigger ingestion; progress statuses appear.
