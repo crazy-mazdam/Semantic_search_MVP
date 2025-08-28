@@ -11,6 +11,7 @@ from ingestion.pipeline import ingest_one_pdf
 from indexing.chroma_db import collection_count
 from dotenv import load_dotenv  
 from indexing.chroma_inspect import list_all_docs
+from indexing.chroma_db import corpus_stats
 
 # TO RUN IN TERMINAL: streamlit run src/ui/app.py
 
@@ -68,20 +69,28 @@ def _env_check() -> tuple[bool, list[str]]:
 
 def _sidebar():
     st.sidebar.title("Settings")
-    st.sidebar.caption("These are fixed defaults for V1-050; we’ll wire them in V1-051/053.")
+    st.sidebar.caption("These are fixed defaults for V1-050; will be adjustable later.")
+
     s = st.session_state[SS["settings"]]
 
-    s["model"] = st.sidebar.selectbox("Model", ["gpt-4.1"], index=0, help="Configured in .env; using GPT-4.1 for MVP.")
-    s["top_k"] = st.sidebar.slider("Top-K chunks", min_value=3, max_value=12, value=s.get("top_k", 5), step=1)
-    s["max_context_chars"] = st.sidebar.slider("Context budget (chars)", min_value=3000, max_value=15000, value=s.get("max_context_chars", 9000), step=500)
+    # Always refresh corpus stats on load
+    st.session_state[SS["corpus_stats"]] = corpus_stats()
+
+    st.sidebar.selectbox("Model", ["gpt-4.1"], index=0, key="model")
+    st.sidebar.slider("Top-K chunks", min_value=3, max_value=12,
+                      value=s.get("top_k", 5), step=1, key="top_k")
+    st.sidebar.slider("Context budget (chars)", min_value=3000, max_value=15000,
+                      value=s.get("max_context_chars", 9000), step=500, key="max_context_chars")
+
     st.sidebar.caption("Language: English only in v1.")
     st.sidebar.divider()
     st.sidebar.markdown("**Corpus**")
+
     stats = st.session_state[SS["corpus_stats"]]
-    st.sidebar.text(f"Docs:   {stats.get('docs', 0)}")
-    st.sidebar.text(f"Chunks: {stats.get('chunks', 0)}")
+    st.sidebar.text(f"Docs:   {stats['docs']}")
+    st.sidebar.text(f"Chunks: {stats['chunks']}")
     st.sidebar.divider()
-    st.sidebar.markdown("[Open logs folder](file:///" + str((APP_ROOT / "data" / "logs").as_posix()) + ")")
+    st.sidebar.markdown("[Open logs folder](file:///" + str((APP_ROOT / 'data' / 'logs').as_posix()) + ")")
 
 def _header():
     st.markdown(f"### {APP_NAME} — {APP_VERSION}")
@@ -116,7 +125,7 @@ def _tab_upload():
     def on_chunk_progress(pct: float, msg: str):
         prog.progress(int(pct), text=msg)
 
-    last_ids = []
+    last_ids = []        
 
     for i, uf in enumerate(uploaded, start=1):
         prog.progress(0, text=f"Saving file {i}/{len(uploaded)}…")
@@ -142,7 +151,9 @@ def _tab_upload():
 
     # Update session state
     if last_ids:
-        st.session_state[SS["last_ingested"]] = last_ids + st.session_state[SS["last_ingested"]]
+        st.session_state[SS["corpus_stats"]] = corpus_stats()
+        prev = st.session_state.get(SS["last_ingested"], [])
+        st.session_state[SS["last_ingested"]] = last_ids + prev
 
     # Update sidebar stats (chunks only for now)
     try:

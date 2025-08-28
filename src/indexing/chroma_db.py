@@ -128,3 +128,14 @@ def collection_count(collection=None) -> int:
         return collection.count()
     except Exception:
         return 0
+    
+def corpus_stats() -> dict:
+    """Return {docs: int, chunks: int} from Chroma collection."""
+    _, coll = init_chroma()
+    try:
+        data = coll.get()
+        chunks = len(data["ids"])
+        docs = len(set(meta.get("doc_id", "unknown") for meta in data["metadatas"]))
+        return {"docs": docs, "chunks": chunks}
+    except Exception:
+        return {"docs": 0, "chunks": 0}
