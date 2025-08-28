@@ -7,11 +7,17 @@ import os
 from pathlib import Path
 import streamlit as st
 from utils.paths import project_root  # if you have it; else compute below
+
 from ingestion.pipeline import ingest_one_pdf
-from indexing.chroma_db import collection_count
-from dotenv import load_dotenv  
+
+from indexing.chroma_db import collection_count, corpus_stats
 from indexing.chroma_inspect import list_all_docs
-from indexing.chroma_db import corpus_stats
+
+from retrieval.dense import retrieve
+
+from generation.answerer import answer_with_citations
+
+from dotenv import load_dotenv 
 
 # TO RUN IN TERMINAL: streamlit run src/ui/app.py
 
@@ -167,11 +173,74 @@ def _tab_upload():
         st.markdown("**Recently ingested document IDs (md5):**")
         st.code("\n".join(last_ids), language="text")
 
+
+
 def _tab_ask():
     st.subheader("Ask")
-    if st.session_state[SS["corpus_stats"]].get("chunks", 0) == 0:
-        st.info("Index is empty. Upload PDFs on the **Upload** tab first.")
+    if collection_count() == 0:
+        st.info("Index is empty. Upload PDFs first on the **Upload** tab.")
         return
+
+    # Question input
+    question = st.text_input(
+        "Your question",
+        placeholder="e.g., How does population aging affect savings and current accounts?"
+    )
+
+    col1, col2 = st.columns([1, 3])
+    run = col1.button("Search", type="primary", use_container_width=True)
+    show_debug = col2.checkbox("Show retrieved chunks")
+
+    # When user clicks Search
+    if run and question.strip():
+        with st.spinner("Retrieving top chunks..."):
+            # Retrieval + LLM call
+            top_k = st.session_state[SS["settings"]]["top_k"]
+            ans = answer_with_citations(question, top_k=top_k, model="gpt-4.1")
+
+        # Store answer in session
+        st.session_state[SS["answer"]] = ans
+
+        # Show final answer
+        st.markdown("### Answer")
+        if ans.answer.strip() == "Not found in corpus.":
+            st.warning("Not found in corpus.")
+        else:
+            st.write(ans.answer)
+
+        # Show citations
+        st.markdown("### Citations")
+        if ans.citations:
+            for i, c in enumerate(ans.citations, 1):
+                st.markdown(f"**[{i}] {c.title} — pages {c.pages}**")
+                st.caption(c.excerpt)
+        else:
+            st.info("No citations returned.")
+
+        # Optional: show retrieved raw chunks for debugging
+        if show_debug:
+            st.markdown("---")
+            st.markdown("### Retrieved Chunks (Debug)")
+            hits = retrieve(question, top_k=top_k)
+
+            # Optional controls
+            expand_all = st.checkbox("Expand all chunks", value=False)
+
+            for i, h in enumerate(hits, 1):
+                title = h.metadata.get("title", "") or h.metadata.get("doc_id", "")
+                pages = h.metadata.get("pages_covered", "")
+                st.markdown(f"**[{i}] {title} — pages {pages}**")
+                # Always show a short preview line (for quick scanning)
+                # preview = h.text[:240].replace("\n", " ")
+                # st.text(preview + ("…" if len(h.text) > 240 else ""))
+
+                # Full text in an expander (like Inspector)
+                with st.expander("Show full text", expanded=expand_all):
+                    st.text(h.text)
+
+                st.caption(f"distance = {h.distance:.3f}")
+                st.divider()
+
 
 def _tab_chroma():
     st.subheader("Chroma Inspector")
