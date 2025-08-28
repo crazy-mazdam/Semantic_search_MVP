@@ -109,7 +109,7 @@
 ## EPIC 3 — Retrieval & Ranking
 **Goal:** Hybrid dense+BM25 retrieval, fused and re-ranked with MMR diversity.
 
-- **V1-030: Dense retrieval**
+- **V1-030: Dense retrieval** - **(DONE - ✅)**
   - *Desc:* Query embeddings; top-K₁ from Chroma with metadata.
   - *Deps:* V1-021, V1-020
   - *DoD:* Returns scored candidates with ids & page anchors.
@@ -149,7 +149,7 @@
 ## EPIC 4 — Generation & Grounding
 **Goal:** Adaptive context packing, GPT-4.1 generation, citations, abstention.
 
-- **V1-040: OpenAI API integration**
+- **V1-040: OpenAI API integration** - **(DONE - ✅)**
   - *Desc:* `generation/openai_api.py` reads `OPENAI_API_KEY` from `.env`; model GPT-4.1.
   - *Deps:* 0
   - *DoD:* Healthy call with retry/backoff and rate-limit handling.
@@ -179,7 +179,7 @@
 ## EPIC 5 — Streamlit UI
 **Goal:** Minimal, focused UI per requirements.
 
-- **V1-050: App skeleton & state**
+- **V1-050: App skeleton & state** **(DONE - ✅)**
   - *Desc:* `ui/app.py` with sidebar nav; `ui/state.py` for session objects & token budget setting (config-only).
   - *Deps:* 0
   - *DoD:* App runs; placeholder panels visible.
