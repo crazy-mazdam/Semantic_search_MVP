@@ -181,34 +181,48 @@ def _tab_ask():
         st.info("Index is empty. Upload PDFs first on the **Upload** tab.")
         return
 
-    # Question input
-    question = st.text_input(
-        "Your question",
-        placeholder="e.g., How does population aging affect savings and current accounts?"
-    )
+    # ---- session state keys for Ask tab ----
+    if "ask_last_q" not in st.session_state: st.session_state["ask_last_q"] = ""
+    if "ask_last_ans" not in st.session_state: st.session_state["ask_last_ans"] = None
+    if "ask_last_hits" not in st.session_state: st.session_state["ask_last_hits"] = []
+    if "ask_show_chunks" not in st.session_state: st.session_state["ask_show_chunks"] = False
 
-    col1, col2 = st.columns([1, 3])
-    run = col1.button("Search", type="primary", use_container_width=True)
-    show_debug = col2.checkbox("Show retrieved chunks")
+    # ---- form: prevents reruns until "Search" is clicked ----
+    with st.form("ask_form", clear_on_submit=False):
+        question = st.text_area(
+            "Your question",
+            value=st.session_state["ask_last_q"],
+            placeholder="e.g., How does population aging affect savings and current accounts?",
+            height=140,
+        )
+        submitted = st.form_submit_button("Search", use_container_width=True)
 
-    # When user clicks Search
-    if run and question.strip():
-        with st.spinner("Retrieving top chunks..."):
-            # Retrieval + LLM call
+    # Run retrieval + LLM only when submitted
+    if submitted and question.strip():
+        st.session_state["ask_last_q"] = question
+        with st.spinner("Retrieving and generating..."):
             top_k = st.session_state[SS["settings"]]["top_k"]
-            ans = answer_with_citations(question, top_k=top_k, model="gpt-4.1")
+            # Retrieve for debug view and to keep consistent with answer context
+            hits = retrieve(question, top_k=top_k)
+            ans = answer_with_citations(question, top_k=top_k, model=st.session_state[SS]["settings"]["model"])
+        # persist results so future reruns (e.g., toggling UI) don’t lose them
+        st.session_state["ask_last_hits"] = hits
+        st.session_state["ask_last_ans"] = ans
+        st.session_state["ask_show_chunks"] = False  # reset view on new search
 
-        # Store answer in session
-        st.session_state[SS["answer"]] = ans
+    ans = st.session_state["ask_last_ans"]
+    hits = st.session_state["ask_last_hits"]
 
-        # Show final answer
-        st.markdown("### Answer")
+    st.markdown("---")
+    st.markdown("### Answer")
+    if ans is None:
+        st.info("Enter a question and click **Search**.")
+    else:
         if ans.answer.strip() == "Not found in corpus.":
             st.warning("Not found in corpus.")
         else:
             st.write(ans.answer)
 
-        # Show citations
         st.markdown("### Citations")
         if ans.citations:
             for i, c in enumerate(ans.citations, 1):
@@ -217,30 +231,29 @@ def _tab_ask():
         else:
             st.info("No citations returned.")
 
-        # Optional: show retrieved raw chunks for debugging
-        if show_debug:
-            st.markdown("---")
+    # Toggle button instead of checkbox (persists answer, no extra compute)
+    if hits:
+        st.markdown("---")
+        colA, colB = st.columns([1, 5])
+        if colA.button(
+            "Show retrieved chunks" if not st.session_state["ask_show_chunks"] else "Hide retrieved chunks",
+            use_container_width=True
+        ):
+            st.session_state["ask_show_chunks"] = not st.session_state["ask_show_chunks"]
+
+        if st.session_state["ask_show_chunks"]:
+            expand_all = colB.checkbox("Expand all", value=False)
             st.markdown("### Retrieved Chunks (Debug)")
-            hits = retrieve(question, top_k=top_k)
-
-            # Optional controls
-            expand_all = st.checkbox("Expand all chunks", value=False)
-
             for i, h in enumerate(hits, 1):
                 title = h.metadata.get("title", "") or h.metadata.get("doc_id", "")
                 pages = h.metadata.get("pages_covered", "")
                 st.markdown(f"**[{i}] {title} — pages {pages}**")
-                # Always show a short preview line (for quick scanning)
-                # preview = h.text[:240].replace("\n", " ")
-                # st.text(preview + ("…" if len(h.text) > 240 else ""))
-
-                # Full text in an expander (like Inspector)
+                preview = h.text[:240].replace("\n", " ")
+                st.text(preview + ("…" if len(h.text) > 240 else ""))
                 with st.expander("Show full text", expanded=expand_all):
                     st.text(h.text)
-
                 st.caption(f"distance = {h.distance:.3f}")
                 st.divider()
-
 
 def _tab_chroma():
     st.subheader("Chroma Inspector")
