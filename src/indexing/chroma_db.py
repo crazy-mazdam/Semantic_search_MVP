@@ -139,3 +139,9 @@ def corpus_stats() -> dict:
         return {"docs": docs, "chunks": chunks}
     except Exception:
         return {"docs": 0, "chunks": 0}
+    
+def clear_all():
+    """Delete entire Chroma collection, start fresh."""
+    client, coll = init_chroma()
+    coll.delete(where={})  # clears all chunks
+    return True

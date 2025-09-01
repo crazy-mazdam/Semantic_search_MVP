@@ -199,7 +199,7 @@
   - *Deps:* 4
   - *DoD:* Usable end-to-end Q→A with citations.
 
-- **V1-054: Reindex button**
+- **V1-054: Reindex button** - **(DONE - ✅)**
   - *Desc:* Manual reindex action; shows ingestion status updates.
   - *Deps:* V1-024
   - *DoD:* Reindex performs incremental update; UI confirmation visible.

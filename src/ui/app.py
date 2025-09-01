@@ -8,7 +8,7 @@ from pathlib import Path
 import streamlit as st
 from utils.paths import project_root  # if you have it; else compute below
 
-from ingestion.pipeline import ingest_one_pdf
+from ingestion.pipeline import ingest_one_pdf, reindex_all_pdfs
 
 from indexing.chroma_db import collection_count, corpus_stats
 from indexing.chroma_inspect import list_all_docs
@@ -100,11 +100,32 @@ def _sidebar():
 
 def _header():
     st.markdown(f"### {APP_NAME} — {APP_VERSION}")
-    st.caption("Minimal UI skeleton (V1-050). Upload & Ask flows will be wired in V1-051 and V1-053.")
+    st.caption("Minimal UI skeleton (V1-050).")
 
 def _tab_upload():
     st.subheader("Upload & Ingestion")
     st.caption("Drop one or more PDFs; we’ll parse → clean → chunk → index locally. Embeddings via OpenAI API.")
+
+    st.caption("Reindex will **wipe existing Chroma data** and rebuild index from all PDFs in `data/pdfs`. "
+           "Old chunks for removed or changed PDFs are deleted, and only current PDFs are indexed fresh.")
+
+
+    # Reindex button at top
+    if st.button("Reindex all PDFs", use_container_width=True):
+        status_box = st.empty()
+        prog = st.progress(0, text="Starting reindex...")
+
+        def on_status(msg: str): status_box.write(msg)
+        def on_progress(pct: float, msg: str): prog.progress(int(pct), text=msg)
+
+        with st.spinner("Reindexing PDFs..."):
+            stats = reindex_all_pdfs(on_status=on_status, on_progress=on_progress)
+
+        # Refresh stats in sidebar after reindex
+        st.session_state[SS["corpus_stats"]] = stats
+        st.success(f"Reindex complete: {stats['docs']} docs, {stats['chunks']} chunks")
+        prog.empty()
+
 
     # Where to save uploads
     app_root = APP_ROOT
@@ -177,6 +198,9 @@ def _tab_upload():
 
 def _tab_ask():
     st.subheader("Ask")
+    st.caption("Ask runs a semantic search on your indexed PDFs, retrieves the most relevant chunks from ChromaDB, "
+               "and sends them to GPT-4.1 via OpenAI API to generate an answer with citations from the source documents.")
+    
     if collection_count() == 0:
         st.info("Index is empty. Upload PDFs first on the **Upload** tab.")
         return
@@ -302,20 +326,20 @@ def main():
             st.write(f"- {p}")
         st.stop()
 
-    tabs = st.tabs(["Upload", "Ask", "Chroma Inspector", "Debug"])
+    tabs = st.tabs(["Ask", "Upload", "Chroma Inspector"])  # , "Debug"
 
     with tabs[0]:
-        _tab_upload()
+        _tab_ask()
 
     with tabs[1]:
-        _tab_ask()
+        _tab_upload()
 
     with tabs[2]:
         _tab_chroma()
 
-    with tabs[3]:
-        st.subheader("Debug")
-        st.json(st.session_state[SS["debug"]])
+    # with tabs[3]:
+    #     st.subheader("Debug")
+    #     st.json(st.session_state[SS["debug"]])
 
     _footer()
 
