@@ -6,17 +6,17 @@
 
 ## Phase 1 — Unified Metadata Schema & IO
 
-- **M-001: Define unified metadata schema**
+- **M-001: Define unified metadata schema** - **(DONE - ✅)**
   - *Desc:* Specify document-level schema: `{doc_id(md5), title*, authors[], year, doc_type, tags[], ingested_at, source_path}` with Pydantic validation & JSON storage under `data/metadata/{doc_id}.json`.
   - *Deps:* V1-010 (PDF parsing), V1-050 (UI shell)
   - *DoD:* `schema.py` + docs; `data/metadata/` folder; sample JSON created & validated.
 
-- **M-002: Metadata IO helpers**
+- **M-002: Metadata IO helpers** - **(DONE - ✅)**
   - *Desc:* Implement `load_metadata(doc_id)`, `save_metadata(doc_id, data)`, `list_metadata()`, `exists(doc_id)`. Enforce schema; auto-set `ingested_at`, `source_path`.
   - *Deps:* M-001
   - *DoD:* Round-trip tests: save→load stable; invalid payloads rejected with clear errors.
 
-- **M-003: Backfill placeholders for existing docs**
+- **M-003: Backfill placeholders for existing docs**  - **(DONE - ✅)**
   - *Desc:* Scan Chroma (or chunks JSONL) for unique `doc_id`s; generate placeholder metadata JSON with minimal fields (`doc_id`, `title=""`, `year=None`, …) for any missing files.
   - *Deps:* M-002, V1-020 (Chroma initialized)
   - *DoD:* Script produces placeholder files without overwriting existing; summary printed.
