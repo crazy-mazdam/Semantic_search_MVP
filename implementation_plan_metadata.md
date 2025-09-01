@@ -30,7 +30,7 @@
 
 ## Phase 2 — Manual entry UI (ingestion-time)
 
-- **M-010: Streamlit metadata form (ingestion)**
+- **M-010: Streamlit metadata form (ingestion)**  - **(DONE - ✅)**
   - *Desc:* On new `doc_id` (no JSON), show a form: **title (required)**, authors, year, doc_type (book/paper/article/report/other), tags. Persist via `save_metadata`.
   - *Deps:* M-002, V1-051 (upload/ingestion tab)
   - *DoD:* Ingestion pauses for new docs until title entered; saved JSON reused on re-run.
