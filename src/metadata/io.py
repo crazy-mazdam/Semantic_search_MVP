@@ -1,9 +1,5 @@
 # src/metadata/io.py
 from __future__ import annotations
-import sys
-sys.path.append('F:\\Semantic_search_MVP\\src')
-
-
 from typing import List, Optional
 from metadata.schema import DocumentMetadata
 

@@ -1,10 +1,5 @@
 # src/indexing/indexer.py
 from __future__ import annotations
-
-import sys
-sys.path.append('F:\Semantic_search_MVP\src')
-
-
 from pathlib import Path
 from typing import Dict, Any, List
 import json

@@ -1,10 +1,20 @@
 # src/ui/app.py
 from __future__ import annotations
-import sys
-sys.path.append('F:\Semantic_search_MVP\src')
 
+# ------------ add src to path
 import os
+import sys
 from pathlib import Path
+
+# Get the project root directory (2 levels up from this file)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+SRC_DIR = PROJECT_ROOT / 'src'
+
+# Add src directory to Python path
+sys.path.append(str(SRC_DIR))
+
+# ------------ end add src to path
+
 import streamlit as st
 from utils.paths import project_root  # if you have it; else compute below
 

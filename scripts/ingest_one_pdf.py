@@ -1,7 +1,18 @@
 # scripts/ingest_one_pdf.py
-from pathlib import Path
+
+# ------------ add src to path
+import os
 import sys
-sys.path.append('F:\Semantic_search_MVP\src')
+from pathlib import Path
+
+# Get the project root directory (2 levels up from this file)
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+SRC_DIR = PROJECT_ROOT / 'src'
+
+# Add src directory to Python path
+sys.path.append(str(SRC_DIR))
+
+# ------------ end add src to path
 
 from ingestion.pipeline import ingest_one_pdf
 
