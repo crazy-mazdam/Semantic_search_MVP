@@ -141,7 +141,30 @@ def corpus_stats() -> dict:
         return {"docs": 0, "chunks": 0}
     
 def clear_all():
-    """Delete entire Chroma collection, start fresh."""
-    client, coll = init_chroma()
-    coll.delete(where={})  # clears all chunks
+    """Delete and recreate the Chroma collection to avoid stale data or conflicts."""
+    from chromadb import PersistentClient
+
+    persist_dir = _persist_dir()
+    client = PersistentClient(path=str(persist_dir))
+
+    # Try to delete old collection completely
+    try:
+        client.delete_collection(COLLECTION_NAME)
+    except Exception:
+        pass  # It's fine if it doesn't exist
+
+    # Recreate with embedder
+    api_key = os.getenv("OPENAI_API_KEY")
+    if not api_key:
+        raise RuntimeError("OPENAI_API_KEY not found in environment or .env")
+
+    embed_fn = OpenAIEmbeddingFunction(
+        api_key=api_key,
+        model_name=os.getenv("OPENAI_EMBED_MODEL", "text-embedding-3-small"),
+    )
+
+    client.create_collection(
+        name=COLLECTION_NAME,
+        embedding_function=embed_fn
+    )
     return True

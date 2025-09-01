@@ -4,6 +4,7 @@ import os, uuid, json
 import sys
 
 sys.path.append('F:\Semantic_search_MVP')
+sys.path.append('F:\Semantic_search_MVP\src')
 
 from pathlib import Path
 from typing import Dict, Any
