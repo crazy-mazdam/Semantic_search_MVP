@@ -1,11 +1,108 @@
-# RAG v1
 
-Local RAG pipeline for economics/finance PDFs:
-- Hybrid retrieval (dense + BM25)
-- GPT-4.1 grounding
-- Streamlit UI with citations
+# Semantic Search RAG MVP
 
-## Quick start
-1. Create venv  
-2. Install deps: `pip install -r requirements.txt`  
-3. Run: `streamlit run src/main.py`  
+Цей проєкт реалізує **Retrieval-Augmented Generation (RAG)** для семантичного пошуку по PDF-документах у сфері економіки та фінансів.  
+Система дозволяє завантажувати документи, автоматично їх індексувати, виконувати семантичний пошук та отримувати відповіді з цитатами за допомогою GPT-4.1.
+
+---
+
+## Основні можливості
+- **Завантаження PDF** через веб-інтерфейс.
+- **Введення метаданих** (назва, автори, рік, теги).
+- **Семантичний пошук** за допомогою ChromaDB + OpenAI Embeddings.
+- **Відповіді з цитатами** із конкретних сторінок документів.
+- **Інспектор Chroma** для перегляду індексованих документів та фрагментів.
+
+---
+
+## Архітектура (спрощено)
+```
+PDF → Парсинг → Очищення → Чанкування → ChromaDB → Пошук релевантних фрагментів → GPT-4.1 → Відповідь з цитатами
+```
+
+---
+
+## Вимоги
+- Python 3.10+
+- pip
+- OpenAI API ключ (для ембеддингів та генерації відповідей)
+
+---
+
+## Встановлення
+
+1. **Клонувати репозиторій**
+```bash
+git clone https://github.com/crazy-mazdam/Semantic_search_MVP
+cd semantic-search-rag
+```
+
+2. **Створити та активувати віртуальне середовище**
+```bash
+python -m venv .venv
+source .venv/bin/activate      # Linux/Mac
+.venv\Scripts\activate         # Windows
+```
+
+3. **Встановити залежності**
+```bash
+pip install -r requirements.txt
+```
+
+4. **Налаштувати .env файл**
+Створіть файл `.env` у корені проєкту з таким вмістом:
+```
+OPENAI_API_KEY=your_openai_api_key_here
+OPENAI_EMBED_MODEL=text-embedding-3-small
+```
+
+---
+
+## Запуск додатку
+
+```bash
+streamlit run src/ui/app.py
+```
+
+Після цього відкрийте у браузері [http://localhost:8501](http://localhost:8501).
+
+---
+
+## Як користуватися
+
+1. **Upload & Ingestion**  
+   - Завантажте PDF через інтерфейс.  
+   - Введіть метадані: назва, автори, рік, теги.  
+   - Натисніть **Start ingestion** — документ буде проіндексовано.
+
+2. **Ask**  
+   - У полі запиту введіть своє питання.  
+   - Отримайте відповідь GPT-4.1 з цитатами на конкретні сторінки.
+
+3. **Chroma Inspector**  
+   - Переглядайте індексовані документи та знайдені фрагменти.
+
+---
+
+## Структура проєкту
+```
+data/           # PDF, індекси, метадані, логи
+src/
+  ingestion/    # Парсинг, очищення, чанкування
+  indexing/     # ChromaDB інтеграція
+  retrieval/    # Семантичний пошук
+  generation/   # Відповіді GPT-4.1
+  ui/           # Streamlit інтерфейс
+  metadata/     # Схеми та збереження метаданих
+  utils/        # Конфігурація, шляхи, логування
+```
+
+---
+
+## Майбутні покращення
+- Автоматична генерація метаданих за допомогою LLM.
+- Гібридний пошук: BM25 + Dense Retrieval.
+- Підтримка кількох мов та локальних LLM.
+
+---
+
