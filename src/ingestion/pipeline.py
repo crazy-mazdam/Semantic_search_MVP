@@ -14,7 +14,7 @@ from ingestion.text_cleaning import clean_document_pages
 from ingestion.chunking_stream import build_chunks_streaming
 from ingestion.pdf_parser import parse_pdf
 from indexing.indexer import upsert_document_chunks
-from indexing.chroma_db import corpus_stats, clear_all
+from indexing.chroma_db import corpus_stats, clear_all, init_chroma
 
 from metadata.io import load_metadata, save_metadata, exists_metadata
 from metadata.schema import DocumentMetadata
@@ -100,6 +100,7 @@ def ingest_one_pdf(
         overlap_tokens=180,
         min_block_len_chars=20,
         on_progress=on_chunk_progress,   # <-- drives UI bar
+        meta_doc=meta,               # <-- for titles in chunks
     )
     report_status(f"chunking_done | file={jsonl_path}")
 
@@ -117,54 +118,90 @@ def reindex_all_pdfs(
     on_progress: ProgressCB = None,
     force: bool = True
 ) -> dict:
-    """Reindex all PDFs from data/pdfs. Returns summary stats."""
+    """
+    Reindex all PDFs from data/pdfs folder in a robust, isolated way.
+    Returns final corpus stats {docs, chunks}.
+    """
 
-    def report_status(msg: str):
+    def report(msg: str):
         if on_status:
-            try: on_status(msg)
-            except Exception: pass
+            try:
+                on_status(msg)
+            except Exception:
+                pass
+        log.info(msg)
 
-    if force:
-        report_status("Force reindex: clearing existing Chroma data...")
-        clear_all()
-
-    pdfs = sorted(Path(pdfs_dir()).glob("*.pdf"))
+    pdf_dir = Path(pdfs_dir())
+    pdfs = sorted(pdf_dir.glob("*.pdf"))
     if not pdfs:
-        report_status("No PDFs found in data/pdfs")
+        report("No PDFs found in data/pdfs")
         return {"docs": 0, "chunks": 0}
 
-    total_docs = 0
+    # Step 1: Clear collection if requested
+    if force:
+        report("Clearing existing Chroma collection...")
+        clear_all()
+
+    # Step 2: Ensure collection exists before starting
+    _, coll = init_chroma()
+
+    # Prepare chunks dir
+    chunks_dir = indexes_dir() / "chunks"
+    chunks_dir.mkdir(parents=True, exist_ok=True)
+
+    total = len(pdfs)
+    successes, failures = 0, 0
+
+    report(f"Starting reindex for {total} PDFs...")
+
+    # Step 3: Process each PDF independently
     for i, pdf_path in enumerate(pdfs, start=1):
-        report_status(f"[{i}/{len(pdfs)}] Reindexing {pdf_path.name}")
+        report(f"[{i}/{total}] Processing {pdf_path.name}")
+
         try:
-            # Same pipeline as ingest_one_pdf
             parsed = parse_pdf(pdf_path)
             doc_id = parsed.md5
 
-            # Clean pages
+            # Load and validate metadata
+            meta = load_metadata(doc_id)
+            if not meta or meta.status != "ready":
+                report(f"Skipping {doc_id}: metadata missing or not ready")
+                failures += 1
+                continue
+
+            # Clean text
             page_texts = [(p.page_number, p.text) for p in parsed.pages]
             cleaned = clean_document_pages(page_texts)
             cleaned_iter = ((cp.page_number, cp.cleaned_text) for cp in cleaned.pages)
 
-            # Chunk
-            out_path = Path("data/indexes/chunks") / f"{doc_id}.jsonl"
+            # Chunk to JSONL
+            jsonl_path = chunks_dir / f"{doc_id}.jsonl"
             build_chunks_streaming(
                 doc_id=doc_id,
                 cleaned_pages_iter=cleaned_iter,
-                out_path=out_path,
+                out_path=jsonl_path,
                 target_tokens=1000,
                 overlap_tokens=180,
                 min_block_len_chars=20,
-                on_progress=on_progress
+                on_progress=on_progress,
+                meta_doc=meta,
             )
 
-            # Index
-            upsert_document_chunks(doc_id, out_path)
-            total_docs += 1
+            # Index into Chroma
+            upsert_document_chunks(doc_id, jsonl_path)
+
+            successes += 1
+            report(f"[{i}/{total}] Done: {pdf_path.name}")
 
         except Exception as e:
-            report_status(f"Error: {e}")
+            failures += 1
+            report(f"[{i}/{total}] Failed: {pdf_path.name} | Error: {e}")
 
+    # Step 4: Final corpus stats
     stats = corpus_stats()
-    report_status(f"Reindex complete. Docs: {stats['docs']}  Chunks: {stats['chunks']}")
+    report(
+        f"Reindex complete. "
+        f"Successes: {successes}, Failures: {failures}, "
+        f"Docs: {stats['docs']}, Chunks: {stats['chunks']}"
+    )
     return stats

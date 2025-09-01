@@ -23,26 +23,30 @@ def load_chunks_jsonl(jsonl_path: str | Path) -> List[Dict[str, Any]]:
     return payload
 
 def upsert_document_chunks(doc_id: str, jsonl_path: str | Path) -> None:
-    """
-    Load chunks from JSONL, flatten metadata to Chroma-safe primitives, and upsert.
-    """
-    # Get human metadata (title, file_path, etc.)
     meta_doc = load_metadata(doc_id)
     title = meta_doc.title if meta_doc else ""
     source_path = meta_doc.source_path if meta_doc else ""
+    authors = (meta_doc.authors or []) if meta_doc else []
+    year = meta_doc.year if meta_doc else None
+    doc_type = meta_doc.doc_type if meta_doc else None
+    tags = (meta_doc.tags or []) if meta_doc else []
+
     payload_raw = load_chunks_jsonl(jsonl_path)
 
-    # Prepare Chroma payload
     payload: List[Dict[str, Any]] = []
     for ch in payload_raw:
         meta = {
-            "doc_id": ch["doc_id"],                          # md5
+            "doc_id": ch["doc_id"],
             "chunk_id": ch["chunk_id"],
-            "title": title,
-            "pages_covered": ",".join(map(str, ch["pages_covered"])),
-            "source_path": source_path,
+            "chunk_idx": ch.get("chunk_idx", 0),                         # int
+            "title": title or "",                                        # str
+            "authors": json.dumps(authors, ensure_ascii=False),          # JSON string (Chroma-safe)
+            "year": year,                                                # int | None
+            "doc_type": doc_type or "",                                  # str
+            "tags": json.dumps(tags, ensure_ascii=False),                # JSON string
+            "pages_covered": ",".join(map(str, ch["pages_covered"])),    # comma string
+            "source_path": source_path or "",
             "md5": ch["doc_id"],
-            # anchors are non-primitive -> JSON string
             "anchors_json": json.dumps(ch.get("anchors", []), ensure_ascii=False),
         }
         payload.append({
@@ -51,6 +55,5 @@ def upsert_document_chunks(doc_id: str, jsonl_path: str | Path) -> None:
             "metadata": meta,
         })
 
-    # Upsert to Chroma
     client, coll = init_chroma()
     add_chunks_batched(coll, payload)

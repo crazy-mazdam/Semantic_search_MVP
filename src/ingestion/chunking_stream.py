@@ -65,6 +65,7 @@ def build_chunks_streaming(
     overlap_tokens: int = 180,
     min_block_len_chars: int = 20,
     on_progress: ProgressCB = None,
+    meta_doc: object | None = None,   # <--- NEW
 ) -> Path:
     """
     Stream pages -> paragraphs -> chunks; write each chunk to JSONL immediately.
@@ -103,7 +104,7 @@ def build_chunks_streaming(
                     cur_tokens += para_tokens
                 else:
                     # flush current chunk
-                    _flush_chunk(doc_id, chunk_idx, cur_blocks, cur_tokens, f)
+                    _flush_chunk(doc_id, chunk_idx, cur_blocks, cur_tokens, f, meta_doc)
                     chunk_idx += 1
 
                     # build overlap tail
@@ -122,7 +123,7 @@ def build_chunks_streaming(
 
         # after all pages, flush remainder
         if cur_blocks:
-            _flush_chunk(doc_id, chunk_idx, cur_blocks, cur_tokens, f)
+            _flush_chunk(doc_id, chunk_idx, cur_blocks, cur_tokens, f, meta_doc)
             chunk_idx += 1
 
     report(100, f"Chunking complete: {chunk_idx} chunks -> {out_path}")
@@ -140,22 +141,59 @@ def _retain_overlap(cur_blocks: List[Tuple[int, str]], overlap_tokens: int) -> T
     kept.reverse()
     return kept, total
 
-def _flush_chunk(doc_id: str, idx: int, blocks: List[Tuple[int, str]], tok_sum: int, fhandle) -> None:
-    # lightweight text join without giant temporary lists
+def _flush_chunk(
+    doc_id: str,
+    idx: int,
+    blocks: List[Tuple[int, str]],
+    tok_sum: int,
+    fhandle,
+    meta_doc: object | None = None,   # NEW: optional doc-level metadata
+) -> None:
+    """
+    Flush one chunk to the JSONL file.
+    Writes text, basic chunk info, and optional doc-level metadata (M-030).
+    """
+    # Join text paragraphs for this chunk
     buf = io.StringIO()
     for i, (_, para) in enumerate(blocks):
-        if i: buf.write("\n\n")
+        if i:
+            buf.write("\n\n")
         buf.write(para)
     text_clean = buf.getvalue()
+
+    # Pages + anchors
     pages = sorted({p for p, _ in blocks})
     anchors = _make_anchors(blocks)
-    ch = Chunk(
-        doc_id=doc_id,
-        chunk_id=_chunk_id(doc_id, idx),
-        chunk_idx=idx,
-        text_clean=text_clean,
-        token_count=tok_sum,
-        pages_covered=pages,
-        anchors=anchors,
-    )
-    fhandle.write(json.dumps(asdict(ch), ensure_ascii=False) + "\n")
+
+    # Base chunk record (always present)
+    record = {
+        "doc_id": doc_id,
+        "chunk_id": _chunk_id(doc_id, idx),
+        "chunk_idx": idx,
+        "text_clean": text_clean,
+        "token_count": tok_sum,
+        "pages_covered": pages,
+        "anchors": anchors,
+    }
+
+    # --- Attach doc-level metadata if provided ---
+    if meta_doc is not None:
+        # Support both Pydantic object and dict
+        def get_field(obj, name, default=None):
+            if hasattr(obj, name):
+                return getattr(obj, name)
+            if isinstance(obj, dict):
+                return obj.get(name, default)
+            return default
+
+        record.update({
+            "title":       get_field(meta_doc, "title"),
+            "authors":     get_field(meta_doc, "authors", []),
+            "year":        get_field(meta_doc, "year"),
+            "doc_type":    get_field(meta_doc, "doc_type"),
+            "tags":        get_field(meta_doc, "tags", []),
+            "source_path": get_field(meta_doc, "source_path"),
+        })
+
+    # Write as one JSONL line
+    fhandle.write(json.dumps(record, ensure_ascii=False) + "\n")
