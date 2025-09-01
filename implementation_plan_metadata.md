@@ -21,7 +21,7 @@
   - *Deps:* M-002, V1-020 (Chroma initialized)
   - *DoD:* Script produces placeholder files without overwriting existing; summary printed.
 
-- **M-004: Minimal doc registry & integrity checks**
+- **M-004: Minimal doc registry & integrity checks**  - **(DONE - ✅)**
   - *Desc:* Add `metadata audit` CLI: detects missing/invalid JSONs, conflicting titles per `doc_id`, orphaned Chroma docs (not in `data/pdfs`), and orphaned metadata (no chunks).
   - *Deps:* M-002
   - *DoD:* `scripts/metadata_audit.py` reports counts/issues; exit codes for CI.
