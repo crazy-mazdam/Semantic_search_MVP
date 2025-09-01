@@ -147,53 +147,38 @@ def _flush_chunk(
     blocks: List[Tuple[int, str]],
     tok_sum: int,
     fhandle,
-    meta_doc: object | None = None,   # NEW: optional doc-level metadata
+    meta_doc: object | None = None
 ) -> None:
     """
-    Flush one chunk to the JSONL file.
-    Writes text, basic chunk info, and optional doc-level metadata (M-030).
+    Write one chunk with doc-level metadata into JSONL.
     """
-    # Join text paragraphs for this chunk
-    buf = io.StringIO()
-    for i, (_, para) in enumerate(blocks):
-        if i:
-            buf.write("\n\n")
-        buf.write(para)
-    text_clean = buf.getvalue()
-
-    # Pages + anchors
+    # Join text paragraphs
+    text = "\n\n".join(para for _, para in blocks)
     pages = sorted({p for p, _ in blocks})
     anchors = _make_anchors(blocks)
 
-    # Base chunk record (always present)
+    # Base chunk record
     record = {
         "doc_id": doc_id,
-        "chunk_id": _chunk_id(doc_id, idx),
+        "chunk_id": f"{doc_id}_{idx}",
         "chunk_idx": idx,
-        "text_clean": text_clean,
+        "text_clean": text,
         "token_count": tok_sum,
         "pages_covered": pages,
-        "anchors": anchors,
+        "anchors": anchors
     }
 
-    # --- Attach doc-level metadata if provided ---
+    # Attach doc-level metadata if available
     if meta_doc is not None:
-        # Support both Pydantic object and dict
-        def get_field(obj, name, default=None):
-            if hasattr(obj, name):
-                return getattr(obj, name)
-            if isinstance(obj, dict):
-                return obj.get(name, default)
-            return default
-
+        get = lambda name, default=None: getattr(meta_doc, name, default) if hasattr(meta_doc, name) else meta_doc.get(name, default) if isinstance(meta_doc, dict) else default
         record.update({
-            "title":       get_field(meta_doc, "title"),
-            "authors":     get_field(meta_doc, "authors", []),
-            "year":        get_field(meta_doc, "year"),
-            "doc_type":    get_field(meta_doc, "doc_type"),
-            "tags":        get_field(meta_doc, "tags", []),
-            "source_path": get_field(meta_doc, "source_path"),
+            "title": get("title"),
+            "authors": get("authors", []),
+            "year": get("year"),
+            "doc_type": get("doc_type"),
+            "tags": get("tags", []),
+            "source_path": get("source_path")
         })
 
-    # Write as one JSONL line
+    # Write JSONL line
     fhandle.write(json.dumps(record, ensure_ascii=False) + "\n")

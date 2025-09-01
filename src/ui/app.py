@@ -351,32 +351,43 @@ def _tab_ask():
                 st.divider()
 
 def _tab_chroma():
-    st.subheader("Chroma Inspector")
-    st.caption("View stored chunks with metadata. Filter by doc_id or expand chunks for full text.")
+    st.subheader("Chroma DB Inspector")
 
-    # Input for filtering
-    filter_doc = st.text_input("Filter by doc_id (leave empty for all docs):", "")
+    # Option to filter for a single document
+    filter_doc = st.text_input("Filter by doc_id (optional)")
 
-    try:
-        docs = list_all_docs(limit_per_doc=3, filter_doc=filter_doc.strip() or None)
-    except Exception as e:
-        st.error(f"Failed to read Chroma: {e}")
-        return
+    # Fetch docs with metadata
+    docs = list_all_docs(limit_per_doc=3, filter_doc=filter_doc if filter_doc else None)
 
     if not docs:
-        st.info("No documents found." if filter_doc else "No documents indexed yet.")
+        st.info("No documents found in Chroma DB.")
         return
 
-    for d in docs:
-        exp_label = f"{d['title'] or d['doc_id']} — {d['chunk_count']} chunks"
-        with st.expander(exp_label, expanded=bool(filter_doc)):  # auto-expand if filtering
-            st.code(f"doc_id: {d['doc_id']}")
-            for i, ch in enumerate(d["chunks"], start=1):
-                st.markdown(f"**Chunk {i} — Pages {ch['pages']}**")
-                st.text(ch["preview"])  # always show preview
-                with st.expander("Show full text"):
-                    st.text(ch["full_text"])  # expandable full text
-                st.divider()
+    for doc in docs:
+        with st.expander(f"Document: {doc['title']} (Chunks: {doc['chunk_count']})", expanded=False):
+            # Document-level metadata
+            st.markdown(f"**Doc ID:** {doc['doc_id']}")
+            st.markdown(f"**Title:** {doc.get('title', '')}")
+            st.markdown(f"**Authors:** {', '.join(doc.get('authors', [])) if doc.get('authors') else 'N/A'}")
+            st.markdown(f"**Year:** {doc.get('year', 'N/A')}")
+            st.markdown(f"**Type:** {doc.get('doc_type', 'N/A')}")
+            st.markdown(f"**Tags:** {', '.join(doc.get('tags', [])) if doc.get('tags') else 'N/A'}")
+            st.markdown(f"**Source Path:** {doc.get('source_path', 'N/A')}")
+
+            st.markdown("---")
+            st.markdown("### Chunks Preview")
+
+            # Chunk-level metadata & preview
+            for ch in doc["chunks"]:
+                with st.expander(f"Chunk {ch['id']} (Pages: {ch['pages']})"):
+                    st.markdown(f"**Preview:** {ch['preview']}")
+                    st.markdown("**Full Text:**")
+                    st.text(ch['full_text'])
+
+                    # Show full per-chunk metadata
+                    st.markdown("**Chunk Metadata:**")
+                    for k, v in ch.get("chunk_meta", {}).items():
+                        st.markdown(f"- **{k}:** {v}")
 
 def _footer():
     st.divider()
