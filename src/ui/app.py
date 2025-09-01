@@ -9,6 +9,7 @@ import streamlit as st
 from utils.paths import project_root  # if you have it; else compute below
 
 from ingestion.pipeline import ingest_one_pdf, reindex_all_pdfs
+from ingestion.utils import save_and_fingerprint
 
 from indexing.chroma_db import collection_count, corpus_stats
 from indexing.chroma_inspect import list_all_docs
@@ -16,6 +17,12 @@ from indexing.chroma_inspect import list_all_docs
 from retrieval.dense import retrieve
 
 from generation.answerer import answer_with_citations
+
+from ui.tabs.upload_tab import show_metadata_form
+
+from datetime import datetime, timezone
+from metadata.io import load_metadata, save_metadata
+from metadata.schema import DocumentMetadata
 
 from dotenv import load_dotenv 
 
@@ -25,6 +32,9 @@ from dotenv import load_dotenv
 APP_NAME = "Semantic Search RAG — MVP"
 APP_VERSION = "v1"
 APP_ROOT = project_root()  # project root
+
+# Session state keys
+PENDING_UPLOAD_IDS = "pending_upload_ids"
 
 # --- Load .env before anything else ---
 load_dotenv(APP_ROOT / ".env")  # look for .env in project root
@@ -56,6 +66,7 @@ def _ensure_session_defaults():
         (SS["settings"], DEFAULT_SETTINGS.copy()),
         (SS["answer"], None),
         (SS["debug"], {}),
+        (PENDING_UPLOAD_IDS, []),  # <-- add this
     ]:
         if k not in st.session_state:
             st.session_state[k] = v
@@ -104,97 +115,157 @@ def _header():
 
 def _tab_upload():
     st.subheader("Upload & Ingestion")
-    st.caption("Drop one or more PDFs; we’ll parse → clean → chunk → index locally. Embeddings via OpenAI API.")
+    st.caption("Drop one or more PDFs; first save & fill metadata, then ingest ready docs.")
 
-    st.caption("Reindex will **wipe existing Chroma data** and rebuild index from all PDFs in `data/pdfs`. "
-           "Old chunks for removed or changed PDFs are deleted, and only current PDFs are indexed fresh.")
+    st.caption(
+        "Reindex will **wipe existing Chroma data** and rebuild index from all PDFs in `data/pdfs`. "
+        "Old chunks for removed or changed PDFs are deleted, and only current PDFs are indexed fresh."
+    )
 
+    # --- Existing metadata editor (shows any draft docs found on disk) ---
+    # This will render forms for metadata with status='draft' or missing title.
+    # (Keeps your current modularity)
+    show_metadata_form()
 
-    # Reindex button at top
+    # --- Reindex (keep your original behavior) ---
     if st.button("Reindex all PDFs", use_container_width=True):
         status_box = st.empty()
-        prog = st.progress(0, text="Starting reindex...")
+        prog = st.progress(0, text="Starting reindex.")
 
         def on_status(msg: str): status_box.write(msg)
         def on_progress(pct: float, msg: str): prog.progress(int(pct), text=msg)
 
-        with st.spinner("Reindexing PDFs..."):
+        with st.spinner("Reindexing PDFs."):
             stats = reindex_all_pdfs(on_status=on_status, on_progress=on_progress)
 
-        # Refresh stats in sidebar after reindex
         st.session_state[SS["corpus_stats"]] = stats
         st.success(f"Reindex complete: {stats['docs']} docs, {stats['chunks']} chunks")
         prog.empty()
 
-
-    # Where to save uploads
+    # --- Upload zone ---
     app_root = APP_ROOT
     pdf_dir = app_root / "data" / "pdfs"
     pdf_dir.mkdir(parents=True, exist_ok=True)
 
     uploaded = st.file_uploader("Upload PDFs", type=["pdf"], accept_multiple_files=True)
-    if not uploaded:
-        st.info("Select one or more PDF files to begin.")
-        return
 
-    run = st.button("Start ingestion", type="primary", use_container_width=True)
-    if not run:
-        return
+    col_pre, col_ing = st.columns([1, 1])
+    with col_pre:
+        prep = st.button("Save uploads & open metadata forms", use_container_width=True)
+    with col_ing:
+        run_ingest = st.button("Ingest Ready (from uploads)", type="primary", use_container_width=True)
 
-    # UI elements
-    status_area = st.container()
-    prog = st.progress(0, text="Waiting…")
+    # Step 1: Save uploads + create/load draft metadata (no indexing)
+    if prep:
+        if not uploaded:
+            st.info("Select one or more PDF files to begin.")
+            st.stop()
 
-    # Helpers to receive pipeline progress
-    def on_status(msg: str):
-        status_area.write(msg)
+        pending_ids = set(st.session_state.get(PENDING_UPLOAD_IDS, []))
+        created = 0
+        updated = 0
 
-    def on_chunk_progress(pct: float, msg: str):
-        prog.progress(int(pct), text=msg)
+        for uf in uploaded:
+            # Save + fingerprint using your helper (writes file and returns doc_id)
+            pdf_path, doc_id, title_guess = save_and_fingerprint(uf, pdf_dir)
 
-    last_ids = []        
+            meta = load_metadata(doc_id)
+            if not meta:
+                # Create draft metadata; user will confirm in the form rendered by show_metadata_form()
+                meta = DocumentMetadata(
+                    status="draft",
+                    doc_id=doc_id,
+                    title=None,
+                    title_guess=title_guess,
+                    authors=[],
+                    year=None,
+                    doc_type="other",
+                    tags=[],
+                    ingested_at=datetime.now(timezone.utc),
+                    source_path=str(pdf_path),
+                )
+                save_metadata(meta)
+                created += 1
+            else:
+                # Make sure source_path points to current file location (idempotent)
+                if not meta.source_path:
+                    meta.source_path = str(pdf_path)
+                    save_metadata(meta)
+                    updated += 1
+            
+            pending_ids.add(doc_id)
 
-    for i, uf in enumerate(uploaded, start=1):
-        prog.progress(0, text=f"Saving file {i}/{len(uploaded)}…")
-        # Persist uploaded file to disk
-        out_path = pdf_dir / uf.name
-        with open(out_path, "wb") as f:
-            f.write(uf.getbuffer())
+        st.session_state[PENDING_UPLOAD_IDS] = list(pending_ids)
+        st.success(f"Prepared {created} new and {updated} updated metadata file(s). Fill the forms above, then click “Ingest Ready”.")
+        st.rerun()
 
-        st.write(f"**[{i}/{len(uploaded)}]** Ingesting: `{uf.name}`")
-        try:
-            doc_id = ingest_one_pdf(
-                out_path,
-                reindex=False,
-                on_status=on_status,
-                on_chunk_progress=on_chunk_progress,
-            )
-            st.success(f"Done: md5={doc_id}")
-            last_ids.append(doc_id)
-        except Exception as e:
-            st.error(f"Failed: {e}")
+    # Step 2: Ingest only docs from this upload set that are metadata-ready
+    if run_ingest:
+        pending_ids = list(st.session_state.get(PENDING_UPLOAD_IDS, []))
+        if not pending_ids:
+            st.warning("Nothing to ingest yet. First click “Save uploads & open metadata forms”, then fill the forms and save.")
+            st.stop()
 
-        prog.progress(100, text=f"Completed {i}/{len(uploaded)}")
+        status_area = st.container()
+        prog = st.progress(0, text="Starting ingestion…")
 
-    # Update session state
-    if last_ids:
-        st.session_state[SS["corpus_stats"]] = corpus_stats()
-        prev = st.session_state.get(SS["last_ingested"], [])
-        st.session_state[SS["last_ingested"]] = last_ids + prev
+        def on_status(msg: str):
+            status_area.write(msg)
 
-    # Update sidebar stats (chunks only for now)
-    try:
-        cnt = collection_count()
-        st.session_state[SS["corpus_stats"]]["chunks"] = cnt
-    except Exception:
-        pass
+        def on_chunk_progress(pct: float, msg: str):
+            prog.progress(int(pct), text=msg)
 
-    st.divider()
-    if last_ids:
-        st.markdown("**Recently ingested document IDs (md5):**")
-        st.code("\n".join(last_ids), language="text")
+        last_ids = []
+        ready_ids, skipped = [], []
 
+        for doc_id in pending_ids:
+            meta = load_metadata(doc_id)
+            if not meta or meta.status != "ready" or not meta.source_path:
+                skipped.append(doc_id)
+                continue
+            ready_ids.append(doc_id)
 
+        total = len(ready_ids)
+        for i, doc_id in enumerate(ready_ids, start=1):
+            meta = load_metadata(doc_id)
+            pdf_path = Path(meta.source_path)
+            prog.progress(int((i - 1) * 100 / max(1, total)), text=f"Ingesting {i}/{total}…")
+            st.write(f"**[{i}/{total}]** Ingesting: `{pdf_path.name}`")
+            try:
+                out_id = ingest_one_pdf(
+                    pdf_path,
+                    reindex=False,
+                    on_status=on_status,
+                    on_chunk_progress=on_chunk_progress,
+                )
+                st.success(f"Done: md5={out_id}")
+                last_ids.append(out_id)
+            except Exception as e:
+                st.error(f"Failed: {e}")
+
+        prog.progress(100, text=f"Completed {len(ready_ids)}/{total}")
+
+        # Refresh stats in sidebar after ingest
+        if last_ids:
+            st.session_state[SS["corpus_stats"]] = corpus_stats()
+            prev = st.session_state.get(SS["last_ingested"], [])
+            st.session_state[SS["last_ingested"]] = last_ids + prev
+
+            # Also try to refresh chunks count (kept from your original flow)
+            try:
+                cnt = collection_count()
+                st.session_state[SS["corpus_stats"]]["chunks"] = cnt
+            except Exception:
+                pass
+
+            st.markdown("**Recently ingested document IDs (md5):**")
+            st.code("\n".join(last_ids), language="text")
+
+        if skipped:
+            st.info(f"Skipped {len(skipped)} doc(s) with draft/missing metadata. Fill forms above and save, then ingest again.")
+
+        # Clear pending set after a run (only the ones we just processed)
+        st.session_state[PENDING_UPLOAD_IDS] = []
 
 def _tab_ask():
     st.subheader("Ask")

@@ -26,6 +26,8 @@ def load_metadata(doc_id: str) -> Optional[DocumentMetadata]:
         return None
     with open(path, "r", encoding="utf-8") as f:
         data = json.load(f)
+
+    # Always return as Pydantic model
     return DocumentMetadata(**data)
 
 

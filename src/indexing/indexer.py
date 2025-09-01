@@ -1,12 +1,18 @@
 # src/indexing/indexer.py
 from __future__ import annotations
+
+import sys
+sys.path.append('F:\Semantic_search_MVP\src')
+
+
 from pathlib import Path
 from typing import Dict, Any, List
 import json
 
 from indexing.chroma_db import init_chroma
 from indexing.chroma_db import add_chunks_batched
-from ingestion.metadata import load_metadata  # to fetch title, file_path by md5
+from metadata.io import load_metadata
+from metadata.schema import DocumentMetadata
 
 def load_chunks_jsonl(jsonl_path: str | Path) -> List[Dict[str, Any]]:
     payload = []
@@ -23,7 +29,7 @@ def upsert_document_chunks(doc_id: str, jsonl_path: str | Path) -> None:
     # Get human metadata (title, file_path, etc.)
     meta_doc = load_metadata(doc_id)
     title = meta_doc.title if meta_doc else ""
-    source_path = meta_doc.file_path if meta_doc else ""
+    source_path = meta_doc.source_path if meta_doc else ""
     payload_raw = load_chunks_jsonl(jsonl_path)
 
     # Prepare Chroma payload

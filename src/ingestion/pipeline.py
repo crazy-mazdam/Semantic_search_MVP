@@ -1,22 +1,50 @@
 # src/ingestion/pipeline.py
 from __future__ import annotations
+
+import sys
+sys.path.append('F:\Semantic_search_MVP\src')
+
 from pathlib import Path
 from typing import Optional, Iterable, Tuple, Callable
 
 from utils.logging_utils import get_logger
 from utils.paths import indexes_dir, pdfs_dir
-from ingestion.metadata import load_metadata
+
 from ingestion.text_cleaning import clean_document_pages
 from ingestion.chunking_stream import build_chunks_streaming
 from ingestion.pdf_parser import parse_pdf
 from indexing.indexer import upsert_document_chunks
 from indexing.chroma_db import corpus_stats, clear_all
 
+from metadata.io import load_metadata, save_metadata, exists_metadata
+from metadata.schema import DocumentMetadata
+from datetime import datetime, timezone
+
 
 log = get_logger("pipeline")
 
 ProgressCB = Optional[Callable[[float, str], None]]  # percent 0..100, message
 StatusCB   = Optional[Callable[[str], None]]          # text status lines
+
+
+def ensure_metadata_for_pdf(pdf_path: Path, doc_id: str):
+    """Create draft metadata JSON if not exists."""
+    if exists_metadata(doc_id):
+        return  # already there → skip
+
+    meta = DocumentMetadata(
+        status="draft",
+        doc_id=doc_id,
+        title=None,
+        title_guess=pdf_path.stem,  # nice prefill for UI
+        authors=[],
+        year=None,
+        doc_type="other",
+        tags=[],
+        ingested_at=datetime.now(timezone.utc),
+        source_path=str(pdf_path)
+    )
+    save_metadata(meta)
 
 def ingest_one_pdf(
     pdf_path: str | Path,
@@ -42,10 +70,16 @@ def ingest_one_pdf(
     doc_id = parsed.md5
     report_status(f"parsed_pdf | md5={doc_id} pages={len(parsed.pages)}")
 
-    # 2) Metadata (optional)
+    # 2) Metadata handling
     meta = load_metadata(doc_id)
+
     if not meta:
-        report_status(f"metadata_missing | md5={doc_id}")
+        raise RuntimeError(f"No metadata found for {doc_id}")
+
+    # Metadata exists but not ready → stop ingestion
+    if meta.status != "ready":
+        log.info(f"Skipping {doc_id}: metadata not ready")
+        return doc_id
 
     # 3) Clean
     page_texts = [(p.page_number, p.text) for p in parsed.pages]
@@ -85,14 +119,14 @@ def reindex_all_pdfs(
 ) -> dict:
     """Reindex all PDFs from data/pdfs. Returns summary stats."""
 
-    if force:
-        report_status("Force reindex: clearing existing Chroma data...")
-        clear_all()
-
     def report_status(msg: str):
         if on_status:
             try: on_status(msg)
             except Exception: pass
+
+    if force:
+        report_status("Force reindex: clearing existing Chroma data...")
+        clear_all()
 
     pdfs = sorted(Path(pdfs_dir()).glob("*.pdf"))
     if not pdfs:
