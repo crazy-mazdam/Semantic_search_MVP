@@ -68,7 +68,7 @@
 
 ## Phase 4 — Pipeline integration
 
-- **M-030: Attach doc-level metadata to chunks**
+- **M-030: Attach doc-level metadata to chunks**  - **(DONE - ✅)**
   - *Desc:* When writing chunks JSONL / upserting to Chroma, include standardized fields: `{doc_id, title, authors, year, doc_type, tags, pages_covered, chunk_idx, source_path}`. Ensure Chroma-safe primitives (JSON-stringify lists).
   - *Deps:* M-002, V1-013s (streaming chunker), V1-020
   - *DoD:* Verified in Chroma Inspector: fields present/consistent for new ingests.
@@ -78,7 +78,7 @@
   - *Deps:* M-030, V1-040/053
   - *DoD:* UI shows citations with titles/pages (and year when set).
 
-- **M-032: Inspector shows metadata fields**
+- **M-032: Inspector shows metadata fields**  - **(DONE - ✅)**
   - *Desc:* Extend “Chroma Inspector” to display `title`, `year`, `doc_type`, `tags`; allow filter by title substring and year.
   - *Deps:* M-030, V1-052
   - *DoD:* Filters work; chunk previews unaffected.
